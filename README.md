@@ -14,12 +14,12 @@ Just clone this repository
 
 **Heart rate collector** requires the following:
 
-- Python (>=3.9.9)
-- pandas >= 1.2.4
-- numpy >= 1.20.1
-- bleak >= 0.12.1
-- matplotlib >= 3.3.4
-- PyQt5 >= 5.15.4
+- Python (>=3.12.0)
+- pandas >= 2.0.3
+- numpy >= 1.24.4
+- bleak >= 0.20.2
+- matplotlib >= 3.7.4
+- PyQt5 >= 5.15.10
 
 To install all dependencies, run this command:
 
