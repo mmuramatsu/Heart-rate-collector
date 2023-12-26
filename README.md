@@ -31,4 +31,4 @@ To install all dependencies, run this command:
 
 Type on terminal:
 
-    $ python dataCollector/dataCollector.py
+    $ python app.py
