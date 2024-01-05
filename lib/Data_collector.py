@@ -40,7 +40,7 @@ class Data_collector(QThread):
     finished_signal = pyqtSignal()
 
 
-    def __init__(self, address, display_graph, capture_ecg, save_current_time):
+    def __init__(self, address, display_graph, capture_ecg, save_current_time, experiment_name, participant_id):
         '''
         Initialize the class variables
 
@@ -56,6 +56,8 @@ class Data_collector(QThread):
         self.display_graph = display_graph
         self.capture_ecg = capture_ecg
         self.save_current_time = save_current_time
+        self.experiment_name = experiment_name
+        self.participant_id = participant_id
 
 
     def run(self):
@@ -80,11 +82,11 @@ class Data_collector(QThread):
 
         if self.data_ecg.time != []:
             # Saving the Raw data (time, timestamp, ecg)
-            self.data_ecg.save_raw_data()
+            self.data_ecg.save_raw_data(self.experiment_name + '-' + self.participant_id + '-ecg')
 
         if self.data_rr.time != []:
             # Saving the Raw data (time, hr, rr)
-            self.data_rr.save_raw_data()
+            self.data_rr.save_raw_data(self.experiment_name + '-' + self.participant_id + '-rr')
 
         # Send a signal to the main thread
         self.finished_signal.emit()

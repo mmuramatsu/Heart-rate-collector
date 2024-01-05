@@ -15,12 +15,12 @@ class Data_ecg(Data):
         self.ecg = []
 
 
-    def save_raw_data(self):
+    def save_raw_data(self, filename=None):
         '''
         Save the all triples (time, timestamp, ECG) received from the Polar H10.
         '''
 
-        filename = 'raw_ecg-' + self.get_time() + '.csv'
+        filename = filename + '-' + self.get_time() + '.csv'
 
         print (f'------ Save raw data in \"{filename}\" ------\n\n')
 

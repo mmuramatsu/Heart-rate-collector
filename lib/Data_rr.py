@@ -15,12 +15,12 @@ class Data_rr(Data):
         self.rr_values = []
 
 
-    def save_raw_data(self):
+    def save_raw_data(self, filename=None):
         '''
         Save the all triples (time, hr, rr) received from the Polar H10.
         '''
 
-        filename = 'raw_rr-' + self.get_time() + '.csv'
+        filename = filename + '-' + self.get_time() + '.csv'
 
         print (f'------ Save raw data in \"{filename}\" ------\n\n')
 

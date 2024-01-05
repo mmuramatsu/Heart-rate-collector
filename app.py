@@ -1,7 +1,7 @@
 import asyncio
 import sys
 
-from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QLabel, QCheckBox, QDesktopWidget, QDialog, QMessageBox, QStatusBar
+from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QLabel, QCheckBox, QDesktopWidget, QDialog, QMessageBox, QStatusBar, QLineEdit, QSpacerItem, QSizePolicy
 
 from lib.Check_status import Check_status
 from lib.Collect_window import Collect_window
@@ -24,7 +24,7 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
 
-        self.setGeometry(0, 0, 500, 200)
+        self.setGeometry(0, 0, 500, 270)
 
         # Setting a central widget to the MainWindow
         central_widget = QWidget(self)
@@ -64,7 +64,31 @@ class MainWindow(QMainWindow):
 
         # Add additional buttons to the main layout
         layout.addWidget(self.check_status_button)
-        layout.addWidget(self.start_collecting_button)
+
+        # Add vertical spacer
+        spacer = QSpacerItem(20, 5, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        layout.addItem(spacer)
+
+        # Create labels and line edits
+        experiment_label = QLabel('Experiment name:')
+        participant_name_label = QLabel('Subject ID:')
+
+        self.experiment_edit = QLineEdit()
+        self.participant_name_edit = QLineEdit()
+
+        line_layout = QHBoxLayout()
+        line_layout.addWidget(experiment_label)
+        line_layout.addWidget(self.experiment_edit)
+
+        # Add the line layout to the main layout
+        layout.addLayout(line_layout)
+
+        line_layout = QHBoxLayout()
+        line_layout.addWidget(participant_name_label)
+        line_layout.addWidget(self.participant_name_edit)
+
+        # Add the line layout to the main layout
+        layout.addLayout(line_layout)
 
         # Create horizontal layout for checkboxes
         checkbox_layout = QHBoxLayout()
@@ -85,6 +109,12 @@ class MainWindow(QMainWindow):
 
         # Add the checkbox layout to the main layout
         layout.addLayout(checkbox_layout)
+
+        # Add vertical spacer
+        spacer = QSpacerItem(20, 2, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        layout.addItem(spacer)
+
+        layout.addWidget(self.start_collecting_button)
 
         # Status bar
         status_bar = QStatusBar()
@@ -247,7 +277,17 @@ class MainWindow(QMainWindow):
         if self.devices_dropdown.currentText() == '':
             QMessageBox.warning(self, "Error", "No devices selected\nSelect a device first.")
             return
+        
+        # If experiment field is empty
+        if self.experiment_edit.text() == '':
+            QMessageBox.warning(self, "Error", "The field \"Experiment name\" is empty.")
+            return
 
+        # If participant id field is empty
+        if self.participant_name_edit.text() == '':
+            QMessageBox.warning(self, "Error", "The field \"Participant ID\" is empty.")
+            return
+        
         address = self.devices_dict[self.devices_dropdown.currentText()]
 
         self.hide()
@@ -257,6 +297,8 @@ class MainWindow(QMainWindow):
                                             self.display_graph_checkbox.isChecked(),
                                             self.collect_ecg_checkbox.isChecked(),
                                             self.save_current_time_checkbox.isChecked(),
+                                            self.experiment_edit.text(),
+                                            self.participant_name_edit.text()
         )
         self.collect_window.show()
 

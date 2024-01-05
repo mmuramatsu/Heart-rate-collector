@@ -14,7 +14,7 @@ class Collect_window(QMainWindow):
     Class responsible for building and implementing the data collection interface functionalities.
     '''
 
-    def __init__(self, app_window, name, address, display_graph, capture_ecg, save_current_time):
+    def __init__(self, app_window, name, address, display_graph, capture_ecg, save_current_time, experiment_name, participant_id):
         '''
         Initialize the data collection UI
 
@@ -34,6 +34,8 @@ class Collect_window(QMainWindow):
         self.display_graph = display_graph
         self.capture_ecg = capture_ecg
         self.save_current_time = save_current_time
+        self.experiment_name = experiment_name
+        self.participant_id = participant_id
 
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
@@ -180,7 +182,7 @@ class Collect_window(QMainWindow):
 
         current_time = datetime.datetime.now()
 
-        filename = 'graph-' + str(current_time) + '.svg'
+        filename = self.experiment_name + '-' + self.participant_id + '-graph-' + str(current_time) + '.svg'
         plt.savefig(filename)
 
         QMessageBox.about(self, "Image saved", f"Image save as \"{filename}\".")
@@ -196,6 +198,8 @@ class Collect_window(QMainWindow):
                                             self.display_graph,
                                             self.capture_ecg,
                                             self.save_current_time,
+                                            self.experiment_name,
+                                            self.participant_id,
         )
 
         self.worker_thread.finished_signal.connect(self.collection_finished)
