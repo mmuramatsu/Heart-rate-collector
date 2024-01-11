@@ -70,22 +70,13 @@ class MainWindow(QMainWindow):
         layout.addItem(spacer)
 
         # Create labels and line edits
-        experiment_label = QLabel('Experiment name:')
-        participant_name_label = QLabel('Subject ID:')
+        output_filename_label = QLabel('Output filename:')
 
-        self.experiment_edit = QLineEdit()
-        self.participant_name_edit = QLineEdit()
+        self.output_filename_edit = QLineEdit()
 
         line_layout = QHBoxLayout()
-        line_layout.addWidget(experiment_label)
-        line_layout.addWidget(self.experiment_edit)
-
-        # Add the line layout to the main layout
-        layout.addLayout(line_layout)
-
-        line_layout = QHBoxLayout()
-        line_layout.addWidget(participant_name_label)
-        line_layout.addWidget(self.participant_name_edit)
+        line_layout.addWidget(output_filename_label)
+        line_layout.addWidget(self.output_filename_edit)
 
         # Add the line layout to the main layout
         layout.addLayout(line_layout)
@@ -278,14 +269,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", "No devices selected\nSelect a device first.")
             return
         
-        # If experiment field is empty
-        if self.experiment_edit.text() == '':
-            QMessageBox.warning(self, "Error", "The field \"Experiment name\" is empty.")
-            return
-
-        # If participant id field is empty
-        if self.participant_name_edit.text() == '':
-            QMessageBox.warning(self, "Error", "The field \"Participant ID\" is empty.")
+        # If output filename field is empty
+        if self.output_filename_edit.text() == '':
+            QMessageBox.warning(self, "Error", "The field \"Output filename\" is empty.")
             return
         
         address = self.devices_dict[self.devices_dropdown.currentText()]
@@ -297,8 +283,7 @@ class MainWindow(QMainWindow):
                                             self.display_graph_checkbox.isChecked(),
                                             self.collect_ecg_checkbox.isChecked(),
                                             self.save_current_time_checkbox.isChecked(),
-                                            self.experiment_edit.text(),
-                                            self.participant_name_edit.text()
+                                            self.output_filename_edit.text(),
         )
         self.collect_window.show()
 

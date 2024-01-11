@@ -40,15 +40,16 @@ class Data_collector(QThread):
     finished_signal = pyqtSignal()
 
 
-    def __init__(self, address, display_graph, capture_ecg, save_current_time, experiment_name, participant_id):
+    def __init__(self, address, display_graph, capture_ecg, save_current_time, output_filename):
         '''
         Initialize the class variables
 
         Parameters:
-            address (str): MAC address of the device
-            display_graph (boolean): flag that decides whether a graph with HR will be displayed or not
-            capture_ecg (boolean): flag that decides whether ECG will be captured with the RR
-            save_current_time (boolean): flag that decides if the current PC time will be saved.
+            address (str): MAC address of the device;
+            display_graph (boolean): flag that decides whether a graph with HR will be displayed or not;
+            capture_ecg (boolean): flag that decides whether ECG will be captured with the RR;
+            save_current_time (boolean): flag that decides if the current PC time will be saved;
+            output_filename (string): filename of the ouput file.
         '''
 
         super().__init__()
@@ -56,8 +57,7 @@ class Data_collector(QThread):
         self.display_graph = display_graph
         self.capture_ecg = capture_ecg
         self.save_current_time = save_current_time
-        self.experiment_name = experiment_name
-        self.participant_id = participant_id
+        self.output_filename = output_filename
 
 
     def run(self):
@@ -82,11 +82,11 @@ class Data_collector(QThread):
 
         if self.data_ecg.time != []:
             # Saving the Raw data (time, timestamp, ecg)
-            self.data_ecg.save_raw_data(self.experiment_name + '-' + self.participant_id + '-ecg')
+            self.data_ecg.save_raw_data(self.output_filename + '-ecg', self.save_current_time)
 
         if self.data_rr.time != []:
             # Saving the Raw data (time, hr, rr)
-            self.data_rr.save_raw_data(self.experiment_name + '-' + self.participant_id + '-rr')
+            self.data_rr.save_raw_data(self.output_filename + '-rr', self.save_current_time)
 
         # Send a signal to the main thread
         self.finished_signal.emit()
@@ -123,14 +123,15 @@ class Data_collector(QThread):
         if data[0] & 0b00010000 == 0b00010000:
 
             if self.save_current_time:
-                t = datetime.datetime.now().time()
+                cur_t = datetime.datetime.now().time()
+                self.data_rr.current_time.append(cur_t)
+
+            if self.data_rr.time == []:
+                # Sets t0 to current time
+                self.data_rr.t0 = ts.time()
+                t = 0
             else:
-                if self.data_rr.time == []:
-                    # Sets t0 to current time
-                    self.data_rr.t0 = ts.time()
-                    t = 0
-                else:
-                    t = ts.time() - self.data_rr.t0
+                t = ts.time() - self.data_rr.t0
 
             self.data_rr.time.append(t)
 
@@ -147,7 +148,7 @@ class Data_collector(QThread):
                 # Plot the HR values list
                 self.plot_signal.emit(t if not self.save_current_time else len(self.data_rr.time)-1, hr)
 
-            print(f'Time: {t} s,   Heart rate: {hr} bpm,       RR-interval: {rr} ms')
+            print(f'Time: {t} s,' + (f'   Current_time: {cur_t}' if self.save_current_time else '') + f'   Heart rate: {hr} bpm,       RR-interval: {rr} ms')
 
 
     def parse_ecg(self, sender, data):
@@ -161,14 +162,14 @@ class Data_collector(QThread):
 
         if data[0] == 0x00:
             if self.save_current_time:
-                t = datetime.datetime.now().time()
+                cur_t = datetime.datetime.now().time()
+                
+            if self.data_ecg.time == []:
+                # Sets t0 to current time
+                self.data_ecg.t0 = ts.time()
+                t = 0.0
             else:
-                if self.data_ecg.time == []:
-                    # Sets t0 to current time
-                    self.data_ecg.t0 = ts.time()
-                    t = 0.0
-                else:
-                    t = ts.time() - self.data_ecg.t0
+                t = ts.time() - self.data_ecg.t0
 
             timestamp = self.convert_to_unsigned_long(data, 1, 8)
             step = 3
@@ -181,6 +182,9 @@ class Data_collector(QThread):
                 self.data_ecg.time.extend([t])
                 self.data_ecg.timestamp.extend([timestamp])
                 self.data_ecg.ecg.extend([ecg])
+
+                if self.save_current_time:
+                    self.data_ecg.current_time.extend([cur_t])
 
 
     def convert_array_to_signed_int(self, data, offset, length):

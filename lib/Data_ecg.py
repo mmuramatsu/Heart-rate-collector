@@ -13,9 +13,10 @@ class Data_ecg(Data):
 
         self.timestamp = []
         self.ecg = []
+        self.current_time = []
 
 
-    def save_raw_data(self, filename=None):
+    def save_raw_data(self, filename=None, save_current_time=False):
         '''
         Save the all triples (time, timestamp, ECG) received from the Polar H10.
         '''
@@ -24,9 +25,16 @@ class Data_ecg(Data):
 
         print (f'------ Save raw data in \"{filename}\" ------\n\n')
 
-        df = pd.DataFrame(data={'time': self.time,
-                                'timestamp': self.timestamp,
-                                'ecg': self.ecg
-        })
+        if not save_current_time:
+            df = pd.DataFrame(data={'time': self.time,
+                                    'timestamp': self.timestamp,
+                                    'ecg': self.ecg
+            })
+        else:
+            df = pd.DataFrame(data={'time': self.time,
+                                    'current_time': self.current_time,
+                                    'timestamp': self.timestamp,
+                                    'ecg': self.ecg
+            })
 
         df.to_csv(filename, sep=',', header=True)

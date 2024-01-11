@@ -14,17 +14,18 @@ class Collect_window(QMainWindow):
     Class responsible for building and implementing the data collection interface functionalities.
     '''
 
-    def __init__(self, app_window, name, address, display_graph, capture_ecg, save_current_time, experiment_name, participant_id):
+    def __init__(self, app_window, name, address, display_graph, capture_ecg, save_current_time, output_filename):
         '''
         Initialize the data collection UI
 
         Paramesters:
-            app_window (MainWindow): reference to the main interface
-            name (str): name of the device
-            address (str): MAC address of the device
-            display_graph (boolean): flag that decides whether a graph with HR will be displayed or not
-            capture_ecg (boolean): flag that decides whether ECG will be captured with the RR
-            save_current_time (boolean): flag that decides if the current PC time will be saved.
+            app_window (MainWindow): reference to the main interface;
+            name (str): name of the device;
+            address (str): MAC address of the device;
+            display_graph (boolean): flag that decides whether a graph with HR will be displayed or not;
+            capture_ecg (boolean): flag that decides whether ECG will be captured with the RR;
+            save_current_time (boolean): flag that decides if the current PC time will be saved;
+            output_filename (string): filename of the output files.
         '''
 
         super(Collect_window, self).__init__()
@@ -34,8 +35,7 @@ class Collect_window(QMainWindow):
         self.display_graph = display_graph
         self.capture_ecg = capture_ecg
         self.save_current_time = save_current_time
-        self.experiment_name = experiment_name
-        self.participant_id = participant_id
+        self.output_filename = output_filename
 
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
@@ -74,8 +74,6 @@ class Collect_window(QMainWindow):
             h_save_button_layout = QHBoxLayout()
             h_save_button_layout.addWidget(self.save_button)
             h_save_button_layout.addStretch(1)
-            self.central_layout.addLayout(h_save_button_layout)
-
             self.central_layout.addLayout(h_save_button_layout)
 
         # Stop button
@@ -182,7 +180,7 @@ class Collect_window(QMainWindow):
 
         current_time = datetime.datetime.now()
 
-        filename = self.experiment_name + '-' + self.participant_id + '-graph-' + str(current_time) + '.svg'
+        filename = self.output_filename + '-graph-' + str(current_time) + '.svg'
         plt.savefig(filename)
 
         QMessageBox.about(self, "Image saved", f"Image save as \"{filename}\".")
@@ -198,8 +196,7 @@ class Collect_window(QMainWindow):
                                             self.display_graph,
                                             self.capture_ecg,
                                             self.save_current_time,
-                                            self.experiment_name,
-                                            self.participant_id,
+                                            self.output_filename,
         )
 
         self.worker_thread.finished_signal.connect(self.collection_finished)
