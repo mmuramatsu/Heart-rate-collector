@@ -20,6 +20,7 @@ Just clone this repository
 - bleak >= 0.20.2
 - matplotlib >= 3.7.4
 - PyQt5 >= 5.15.10
+- pynput >= 1.7.6
 
 To install all dependencies, run this command:
 

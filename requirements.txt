@@ -3,3 +3,4 @@ numpy
 bleak
 matplotlib
 PyQt5
+pynput
