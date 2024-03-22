@@ -1,7 +1,8 @@
 import asyncio
 import sys
 
-from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QLabel, QCheckBox, QDesktopWidget, QDialog, QMessageBox, QStatusBar, QLineEdit, QSpacerItem, QSizePolicy
+from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QLabel, QCheckBox, QDesktopWidget, QDialog, QMessageBox, QStatusBar, QLineEdit, QSpacerItem, QSizePolicy, QFileDialog
+from PyQt5.QtGui import QIntValidator
 
 from lib.Check_status import Check_status
 from lib.Collect_window import Collect_window
@@ -24,7 +25,7 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
 
-        self.setGeometry(0, 0, 500, 270)
+        self.setGeometry(0, 0, 600, 500)
 
         # Setting a central widget to the MainWindow
         central_widget = QWidget(self)
@@ -41,10 +42,12 @@ class MainWindow(QMainWindow):
 
         # Create dropdown
         self.devices_dropdown = QComboBox(self)
+        self.devices_dropdown.setToolTip('Polar devices.')
 
         # Create scan button
         self.scan_button = QPushButton('Scan', self)
         self.scan_button.clicked.connect(self.scan_devices)
+        self.scan_button.setToolTip('Seaching for Polar sensor devices.')
 
         # Add widgets to the line layout
         line_layout.addWidget(label)
@@ -57,10 +60,18 @@ class MainWindow(QMainWindow):
         # Create "Check device status" button
         self.check_status_button = QPushButton('Check device status', self)
         self.check_status_button.clicked.connect(self.check_status)
+        self.check_status_button.setToolTip('Get the selected device status (model, batery, etc.).')
+
+        # Create "Settings" button
+
+        self.settings_button = QPushButton('Experiment settings', self)
+        self.settings_button.clicked.connect(self.settings)
+        self.settings_button.setToolTip('Show a configuration window to set the experiments parameters.')
 
         # Create "Start collecting" button
         self.start_collecting_button = QPushButton('Start collecting', self)
         self.start_collecting_button.clicked.connect(self.start_collecting)
+        self.start_collecting_button.setToolTip('Starts the data collection.')
 
         # Add additional buttons to the main layout
         layout.addWidget(self.check_status_button)
@@ -73,6 +84,7 @@ class MainWindow(QMainWindow):
         output_filename_label = QLabel('Output filename:')
 
         self.output_filename_edit = QLineEdit()
+        self.output_filename_edit.setToolTip('Set the output file name')
 
         line_layout = QHBoxLayout()
         line_layout.addWidget(output_filename_label)
@@ -86,12 +98,15 @@ class MainWindow(QMainWindow):
 
         # Create "Display graph" checkbox
         self.display_graph_checkbox = QCheckBox('Display graph', self)
+        self.display_graph_checkbox.setToolTip('Display a (time, HR) graph during the data collection.')
 
         # Create "Collect ECG" checkbox
         self.collect_ecg_checkbox = QCheckBox('Collect ECG', self)
+        self.collect_ecg_checkbox.setToolTip('Also collect ECG during the data collection.')
 
         # Create "Save current time" checkbox
         self.save_current_time_checkbox = QCheckBox('Save current time', self)
+        self.save_current_time_checkbox.setToolTip('Save current machine time (HH:MM:SS) during the data collection.')
 
         # Add checkboxes to the horizontal layout
         checkbox_layout.addWidget(self.display_graph_checkbox)
@@ -102,9 +117,21 @@ class MainWindow(QMainWindow):
         layout.addLayout(checkbox_layout)
 
         # Add vertical spacer
+        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        layout.addItem(spacer)
+
+        layout.addWidget(QLabel('Experiments variations:'))
+
+        # Create "Tapping experiment" checkbox
+        self.tapping_experiment_checkbox = QCheckBox('Tapping experiment', self)
+        self.tapping_experiment_checkbox.setToolTip('During data collection, when the \'B\' key is pressed, the moment it was pressed will be saved in another file.')
+        layout.addWidget(self.tapping_experiment_checkbox)
+
+        # Add vertical spacer
         spacer = QSpacerItem(20, 2, QSizePolicy.Minimum, QSizePolicy.Expanding)
         layout.addItem(spacer)
 
+        layout.addWidget(self.settings_button)
         layout.addWidget(self.start_collecting_button)
 
         # Status bar
@@ -125,6 +152,10 @@ class MainWindow(QMainWindow):
         # Center the window on the screen
         self.center_window()
 
+        self.setting_values = {
+            'dummy': '10',
+        }
+        
         self.show()
 
 
@@ -284,8 +315,47 @@ class MainWindow(QMainWindow):
                                             self.collect_ecg_checkbox.isChecked(),
                                             self.save_current_time_checkbox.isChecked(),
                                             self.output_filename_edit.text(),
+                                            self.tapping_experiment_checkbox.isChecked(),
+                                            self.setting_values,
         )
         self.collect_window.show()
+
+    
+    def settings(self, setting_values=None):
+        '''
+        '''
+
+        setting_values = self.setting_values
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Experiment settings")
+        #dialog.setGeometry(self.parent_x, self.parent_y, 400, 200)
+
+        layout = QVBoxLayout(dialog)
+
+        def save_config():
+            '''
+            Save the new configuration
+            '''
+
+            # Saving here!
+
+            dialog.accept()
+
+        # Create "Start collecting" button
+        ok_button = QPushButton('Save', self)
+        ok_button.clicked.connect(save_config)
+
+        h_layout = QHBoxLayout()
+        inner_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Maximum)
+        h_layout.addItem(inner_spacer)
+        h_layout.addWidget(ok_button)
+        inner_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Maximum)
+        h_layout.addItem(inner_spacer)
+
+        layout.addLayout(h_layout)
+
+        dialog.exec_()  # Use exec_() to display the dialog
 
 
 if __name__ == '__main__':

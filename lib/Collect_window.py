@@ -7,6 +7,7 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 
 from lib.Data_collector import Data_collector
+from lib.Tapping_thread import Tapping_thread
 
 
 class Collect_window(QMainWindow):
@@ -14,7 +15,7 @@ class Collect_window(QMainWindow):
     Class responsible for building and implementing the data collection interface functionalities.
     '''
 
-    def __init__(self, app_window, name, address, display_graph, capture_ecg, save_current_time, output_filename):
+    def __init__(self, app_window, name, address, display_graph, capture_ecg, save_current_time, output_filename, tapping_flag):
         '''
         Initialize the data collection UI
 
@@ -25,7 +26,8 @@ class Collect_window(QMainWindow):
             display_graph (boolean): flag that decides whether a graph with HR will be displayed or not;
             capture_ecg (boolean): flag that decides whether ECG will be captured with the RR;
             save_current_time (boolean): flag that decides if the current PC time will be saved;
-            output_filename (string): filename of the output files.
+            output_filename (string): filename of the output files;
+            tapping_flag (boolean): flag thta decides if the tapping experiment will occur.
         '''
 
         super(Collect_window, self).__init__()
@@ -36,6 +38,7 @@ class Collect_window(QMainWindow):
         self.capture_ecg = capture_ecg
         self.save_current_time = save_current_time
         self.output_filename = output_filename
+        self.tapping_flag = tapping_flag
 
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
@@ -91,6 +94,7 @@ class Collect_window(QMainWindow):
         self.is_animation_running = True
 
         self.is_processing = True
+        self.tapping_is_processing = True
 
         # Center the window on the screen
         self.center_window()
@@ -108,13 +112,13 @@ class Collect_window(QMainWindow):
         If the graph is being presented, the user will need to confirm to exit the screen
         '''
 
-        if not self.is_processing:
-            if self.display_graph:
-                close = QMessageBox.question(self, "Quit?", "Are you sure want return?", QMessageBox.Yes | QMessageBox.No)
+        if not self.is_processing and ((self.tapping_flag and not self.tapping_is_processing) ^ (not self.tapping_flag)):
+                if self.display_graph:
+                    close = QMessageBox.question(self, "Quit?", "Are you sure want return?", QMessageBox.Yes | QMessageBox.No)
 
-                if close == QMessageBox.No:
-                    event.ignore()
-                    return
+                    if close == QMessageBox.No:
+                        event.ignore()
+                        return
         else:
             QMessageBox.warning(self, "Error", "You need to stop the processing first.")
             event.ignore()
@@ -142,6 +146,10 @@ class Collect_window(QMainWindow):
 
         # Emit the signal to stop the worker thread
         self.worker_thread.stop_signal.emit()
+
+        # Emit the signal to stop the tapping experiment
+        if self.tapping_flag:
+            self.tapping_experiment_thread.stop_signal.emit()
 
         if self.display_graph:
             self.ani.event_source.stop()
@@ -204,6 +212,14 @@ class Collect_window(QMainWindow):
         self.worker_thread.plot_signal.connect(self.att_plot)
         self.worker_thread.stop_signal.connect(self.worker_thread.stop)
 
+        if self.tapping_flag:
+            self.tapping_experiment_thread = Tapping_thread(self.save_current_time,
+                                                            self.output_filename,
+            )
+
+            self.tapping_experiment_thread.stop_signal.connect(self.tapping_experiment_thread.stop)
+            self.tapping_experiment_thread.finished_signal.connect(self.tapping_thread_finished)
+
         # Start the worker thread
         self.worker_thread.start()
 
@@ -242,3 +258,16 @@ class Collect_window(QMainWindow):
         '''
 
         self.stop_button.setEnabled(True)
+
+        # Start tapping thread
+        if self.tapping_flag:
+            self.tapping_experiment_thread.start()
+
+    
+    def tapping_thread_finished(self):
+        '''
+        This function are called when the Tapping thread are finished
+        '''
+
+        self.tapping_is_processing = False
+        return
