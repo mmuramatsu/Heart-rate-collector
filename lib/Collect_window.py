@@ -15,7 +15,7 @@ class Collect_window(QMainWindow):
     Class responsible for building and implementing the data collection interface functionalities.
     '''
 
-    def __init__(self, app_window, name, address, display_graph, capture_ecg, save_current_time, output_filename, tapping_flag):
+    def __init__(self, app_window, name, address, display_graph, capture_ecg, save_current_time, output_filename, tapping_flag, setting_values):
         '''
         Initialize the data collection UI
 
@@ -28,6 +28,7 @@ class Collect_window(QMainWindow):
             save_current_time (boolean): flag that decides if the current PC time will be saved;
             output_filename (string): filename of the output files;
             tapping_flag (boolean): flag thta decides if the tapping experiment will occur.
+            setting_values (dict): aditional settings fo the experiment
         '''
 
         super(Collect_window, self).__init__()
@@ -39,6 +40,7 @@ class Collect_window(QMainWindow):
         self.save_current_time = save_current_time
         self.output_filename = output_filename
         self.tapping_flag = tapping_flag
+        self.setting_values = setting_values
 
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
