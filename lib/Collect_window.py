@@ -28,7 +28,7 @@ class Collect_window(QMainWindow):
             save_current_time (boolean): flag that decides if the current PC time will be saved;
             output_filename (string): filename of the output files;
             tapping_flag (boolean): flag thta decides if the tapping experiment will occur.
-            setting_values (dict): aditional settings fo the experiment
+            setting_values (dict): aditional settings for the experiment
         '''
 
         super(Collect_window, self).__init__()
