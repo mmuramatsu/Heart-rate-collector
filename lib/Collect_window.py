@@ -10,6 +10,8 @@ from lib.Data_collector import Data_collector
 from lib.Tapping_thread import Tapping_thread
 
 
+WINDOW_LIMIT = {'All data': None, '1 minute': 60, '2 minutes': 120, '3 minutes': 180, '4 minutes': 240, '5 minutes': 300, '10 minutes': 600}
+
 class Collect_window(QMainWindow):
     '''
     Class responsible for building and implementing the data collection interface functionalities.
@@ -61,12 +63,19 @@ class Collect_window(QMainWindow):
 
             # Initial plot
             self.ax = self.figure.add_subplot(111)
-            self.x_data, self.y_data = [], []
+            self.x_data, self.y_data, self.state = [], [], []
             self.line, = self.ax.plot(self.x_data, self.y_data)
+            if self.setting_values['display_decision_boundary']:
+                self.threshold_line, = self.ax.plot(self.x_data, [setting_values['decision_boundary']]*len(self.x_data))
+
+            if self.setting_values['display_states']:
+                self.state_sign = self.ax.scatter([], [], color='red', marker='X', s=100)
+                self.len_state_sign = 0
+                self.state_points = []
 
             # Set xlabel and ylabel
             self.ax.set_xlabel('Time (s)' if not self.save_current_time else 'Index')
-            self.ax.set_ylabel('Heart rate (BPM)')
+            self.ax.set_ylabel(self.setting_values['representation_type_value'])
 
             # Animation
             self.ani = animation.FuncAnimation(self.figure, self.update_plot, interval=1000, save_count=10)
@@ -168,8 +177,35 @@ class Collect_window(QMainWindow):
         if not self.is_animation_running:
             return
 
+        # Define a Window limit if is necessary
+        limit = WINDOW_LIMIT[self.setting_values['window_limit_value']]
+
+        # If a limit is not needed, all data will be used, otherwise data will be trimmed
+        if limit == None or self.x_data == []:
+            x, y, state = self.x_data, self.y_data, self.state
+        else:
+            x, y, state = self.x_data[-limit:], self.y_data[-limit:], self.state[-limit:]
+
         # Update the plot
-        self.line.set_data(self.x_data, self.y_data)
+        self.line.set_data(x, y)
+
+        # Add a boundary line
+        if self.setting_values['display_decision_boundary']:
+            self.threshold_line.set_data(x, [int(self.setting_values['decision_boundary'])]*len(x))
+
+        # Add the state change sign
+        if self.setting_values['display_states']:
+            if len(state) != self.len_state_sign and len(state) > 1:
+
+                if state[-2] != state[-1]: 
+                    self.state_points.append((x[-1], y[-1]))
+
+                if len(self.state_points) > 0:
+                    if self.state_points[0][0] < x[0]:
+                        self.state_points = self.state_points[1:]
+
+                    x_state, y_state = zip(*self.state_points)
+                    self.state_sign.set_offsets(list(zip(x_state, y_state)))
 
         # Adjust plot limits if needed
         self.ax.relim()
@@ -185,8 +221,20 @@ class Collect_window(QMainWindow):
 
         plt.figure(figsize=(14,8), dpi=100)
         plt.xlabel('Time (s)' if not self.save_current_time else 'Index')
-        plt.ylabel('Heart rate (BPM)')
+        plt.ylabel(self.setting_values['representation_type_value'])
         plt.plot(self.x_data, self.y_data)
+
+        if self.setting_values['display_decision_boundary']:
+            plt.plot(self.x_data, [int(self.setting_values['decision_boundary'])]*len(self.x_data))
+
+        if self.setting_values['display_states']:
+            x_state, y_state = [], []
+            for i in range(1, len(self.state)):
+                if self.state[i-1] != self.state[i]:
+                    x_state.append(self.x_data[i])
+                    y_state.append(self.y_data[i])
+
+            plt.scatter(x_state, y_state, color='red', marker='X', s=100)
 
         current_time = datetime.datetime.now()
 
@@ -207,6 +255,7 @@ class Collect_window(QMainWindow):
                                             self.capture_ecg,
                                             self.save_current_time,
                                             self.output_filename,
+                                            self.setting_values,
         )
 
         self.worker_thread.finished_signal.connect(self.collection_finished)
@@ -226,7 +275,7 @@ class Collect_window(QMainWindow):
         self.worker_thread.start()
 
 
-    def att_plot(self, x, y):
+    def att_plot(self, x, y, state):
         '''
         This function add new values to the axis array
 
@@ -238,6 +287,7 @@ class Collect_window(QMainWindow):
         # Update data
         self.x_data.append(x)
         self.y_data.append(y)
+        self.state.append(state)
 
 
     def collection_finished(self):

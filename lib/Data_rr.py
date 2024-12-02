@@ -14,9 +14,14 @@ class Data_rr(Data):
         self.hr_values = []
         self.rr_values = []
         self.current_time = []
+        self.std = []
+
+        self.state = [0]
+        self.current_state = 0
+        self.count_state = 0
 
 
-    def save_raw_data(self, filename=None, save_current_time=False):
+    def save_raw_data(self, filename=None, save_current_time=False, additional_var=None):
         '''
         Save the all triples (time, hr, rr) received from the Polar H10.
         '''
@@ -25,16 +30,19 @@ class Data_rr(Data):
 
         print (f'------ Save raw data in \"{filename}\" ------\n\n')
 
-        if not save_current_time:
-            df = pd.DataFrame(data={'time': self.time,
-                                    'heart_rate': self.hr_values,
-                                    'rr_interval': self.rr_values
-            })
-        else:
-            df = pd.DataFrame(data={'time': self.time,
-                                    'current_time': self.current_time,
-                                    'heart_rate': self.hr_values,
-                                    'rr_interval': self.rr_values
-            })
+        data_columns = [self.time, self.hr_values, self.rr_values]
+        data_columns_names = ['time', 'heart rate', 'rr interval']
+
+        if save_current_time:
+            data_columns = [self.time, self.current_time, self.hr_values, self.rr_values]
+            data_columns_names = ['time', 'current_time', 'heart rate', 'rr interval']
+
+        if additional_var == 'sdNN':
+            data_columns.append(self.std)
+            data_columns_names.append('sdNN')
+
+        df = pd.DataFrame(data=data_columns)
+        df = df.T
+        df.columns = data_columns_names
 
         df.to_csv(filename, sep=',', header=True)

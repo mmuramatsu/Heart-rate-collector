@@ -3,9 +3,14 @@ import datetime
 import time as ts
 
 from bleak import BleakClient
+from hrvanalysis import get_nn_intervals
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from PyQt5.QtCore import QThread, pyqtSignal
 
+
+from lib.Data import Data
 from lib.Data_ecg import Data_ecg
 from lib.Data_rr import Data_rr
 
@@ -35,12 +40,12 @@ class Data_collector(QThread):
 
     # Variables that connect this thread with the main thread
     start_collecting = pyqtSignal()
-    plot_signal = pyqtSignal(float, float)
+    plot_signal = pyqtSignal(float, float, int)
     stop_signal = pyqtSignal()
     finished_signal = pyqtSignal()
 
 
-    def __init__(self, address, display_graph, capture_ecg, save_current_time, output_filename):
+    def __init__(self, address, display_graph, capture_ecg, save_current_time, output_filename, setting_values):
         '''
         Initialize the class variables
 
@@ -49,7 +54,8 @@ class Data_collector(QThread):
             display_graph (boolean): flag that decides whether a graph with HR will be displayed or not;
             capture_ecg (boolean): flag that decides whether ECG will be captured with the RR;
             save_current_time (boolean): flag that decides if the current PC time will be saved;
-            output_filename (string): filename of the ouput file.
+            output_filename (string): filename of the ouput file;
+            setting_values (dict): aditional settings for the experiment.
         '''
 
         super().__init__()
@@ -58,6 +64,7 @@ class Data_collector(QThread):
         self.capture_ecg = capture_ecg
         self.save_current_time = save_current_time
         self.output_filename = output_filename
+        self.setting_values = setting_values
 
 
     def run(self):
@@ -86,7 +93,9 @@ class Data_collector(QThread):
 
         if self.data_rr.time != []:
             # Saving the Raw data (time, hr, rr)
-            self.data_rr.save_raw_data(self.output_filename + '-rr', self.save_current_time)
+            self.data_rr.save_raw_data(self.output_filename + '-rr', self.save_current_time, self.setting_values['representation_type_value'])
+
+        self.save_config()
 
         # Send a signal to the main thread
         self.finished_signal.emit()
@@ -144,9 +153,38 @@ class Data_collector(QThread):
             rr = int.from_bytes(data[2:4], byteorder='little', signed=False)
             self.data_rr.rr_values.append(rr)
 
+            # Calculate the sdNN if necessary
+            if self.setting_values['representation_type'] == 1:
+                rr_window = int(self.setting_values['rr_window'])
+
+                nn_intervals = get_nn_intervals(self.data_rr.rr_values, verbose=False)
+
+                if len(nn_intervals) < rr_window:
+                    std = np.std(nn_intervals)
+                else:
+                    std = np.std(nn_intervals[-rr_window:])
+
+                self.data_rr.std.append(std)
+
+            # Calculate the state based on time, if necessary
+            if self.setting_values['display_states']:
+                target_state = 0 if self.data_rr.current_state == 0 else 1
+                max_time = int(self.setting_values[f'time_in_state_{target_state}'])
+                self.data_rr.state.append(target_state if self.data_rr.count_state < max_time else 1 - target_state)
+
+                self.data_rr.count_state += 1
+
+                if self.data_rr.count_state >= max_time:
+                    self.data_rr.count_state = 0
+
+                    self.data_rr.current_state = 1 if target_state == 0 else 0
+
             if self.display_graph:
                 # Plot the HR values list
-                self.plot_signal.emit(t if not self.save_current_time else len(self.data_rr.time)-1, hr)
+                if self.setting_values['representation_type'] == 0:
+                    self.plot_signal.emit(t if not self.save_current_time else len(self.data_rr.time)-1, hr, self.data_rr.state[-1])
+                elif self.setting_values['representation_type'] == 1:
+                    self.plot_signal.emit(t if not self.save_current_time else len(self.data_rr.time)-1, std, self.data_rr.state[-1])
 
             print(f'Time: {t} s,' + (f'   Current_time: {cur_t}' if self.save_current_time else '') + f'   Heart rate: {hr} bpm,       RR-interval: {rr} ms')
 
@@ -295,3 +333,15 @@ class Data_collector(QThread):
 
         except Exception as e:
             print(e)
+    
+
+    def save_config(self):
+        '''
+        '''
+        df = pd.DataFrame([self.setting_values])
+
+        filename = 'config-' + str(datetime.datetime.now()) + '.csv'
+
+        df.to_csv(filename, sep=',', header=True)
+
+        print (f'------ Save config in \"{filename}\" ------\n\n')

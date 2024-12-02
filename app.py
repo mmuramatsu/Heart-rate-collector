@@ -1,9 +1,13 @@
-import asyncio
+import json
+import os
 import sys
 
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QComboBox, QPushButton, QLabel, QCheckBox, QDesktopWidget, QDialog, QMessageBox, QStatusBar, QLineEdit, QSpacerItem, QSizePolicy, QFileDialog
 from PyQt5.QtGui import QIntValidator
 
+from lib.Boundary_calculation import Boundary_calculation
 from lib.Check_status import Check_status
 from lib.Collect_window import Collect_window
 from lib.Scan import Scan
@@ -21,7 +25,10 @@ class MainWindow(QMainWindow):
 
         super().__init__()
 
+        self.init_config()
+
         self.init_ui()
+
 
     def init_ui(self):
 
@@ -151,12 +158,42 @@ class MainWindow(QMainWindow):
 
         # Center the window on the screen
         self.center_window()
-
-        self.setting_values = {
-            'dummy': '10',
-        }
         
         self.show()
+
+
+    def init_config(self):
+        '''
+        Initialize the configuration file
+        '''
+        if os.path.isfile('config.json'):
+            # Opening JSON file
+            with open('config.json', 'r') as openfile:
+                # Reading from json file
+                self.setting_values = json.load(openfile)
+        else:
+            self.setting_values = {
+                'representation_type': 0,
+                'representation_type_value': 'Heart rate (BPM)',
+                'window_limit': 0,
+                'window_limit_value': 'All data',
+                'rr_window' : '5',
+                'display_states': False,
+                'time_in_state_0': '40',
+                'time_in_state_1': '40',
+                'display_decision_boundary': False,
+                'decision_boundary' : '100',
+            }
+
+            self.write_config_file(self.setting_values)
+
+
+    def write_config_file(self, dictionary):
+        '''
+        Write the config on a JSON file
+        '''
+        with open('config.json', 'w') as outfile:
+            json.dump(dictionary, outfile)
 
 
     def center_window(self):
@@ -320,12 +357,70 @@ class MainWindow(QMainWindow):
         )
         self.collect_window.show()
 
-    
-    def settings(self, setting_values=None):
+
+    def select_folder(self):
         '''
+        '''
+        # Open a folder selection dialog
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select a File", "", "All Files (*);;Text Files (*.txt)")
+
+        if file_path:  # If a folder is selected
+            self.ok_button.setEnabled(False)
+            self.find_best_boundary(file_path)
+
+
+    def find_best_boundary(self, path):
+        '''
+        This function calculate the best boundary from a file.
+
+        It is necessary to set a RR window size to calculate the sdNN correct
+        '''
+        # Create the worker thread with the number of steps
+        self.worker_thread = Boundary_calculation(path)
+        self.worker_thread.finished_signal.connect(self.find_best_boundary_finished)
+
+        # Start the worker thread
+        self.worker_thread.start()
+
+
+    def find_best_boundary_finished(self, best_boundary, std, tmp1):
+        '''
+        Function are called when the WorkThread finished.
+
+        This function shows a plot with the data and the best boundary.
         '''
 
-        setting_values = self.setting_values
+        self.threshold_line_textbox.setText(str(best_boundary))
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Best boundary")
+
+        layout = QVBoxLayout(dialog)
+
+        fig, ax = Figure(figsize=(10,8), dpi=100), None
+        canvas = FigureCanvas(fig)
+        canvas_widget = canvas
+        layout.addWidget(canvas_widget)
+
+        # Initial plot
+        ax = fig.add_subplot(111)
+        scatter = ax.scatter(tmp1, std)
+        line, = ax.plot(tmp1, [best_boundary for _ in range(len(tmp1))], color='red')
+        
+        # Set xlabel and ylabel
+        ax.set_xlabel('Window')
+        ax.set_ylabel('sdNN')
+
+        dialog.exec_()  # Use exec_() to display the dialog
+        self.ok_button.setEnabled(True)
+
+    
+    def settings(self):
+        '''
+        Draw a window to manage collection settings
+        '''
+
+        default_values = self.setting_values
 
         dialog = QDialog(self)
         dialog.setWindowTitle("Experiment settings")
@@ -333,23 +428,164 @@ class MainWindow(QMainWindow):
 
         layout = QVBoxLayout(dialog)
 
+        graph_settings = QLabel("Plot settings")
+        layout.addWidget(graph_settings)
+
+        h_layout = QHBoxLayout()
+
+        representation_type = QLabel("Variable displayed:")
+        representation_type_dropdown = QComboBox(self)
+        representation_type_dropdown.addItems(['Heart rate (BPM)', 'sdNN'])
+        representation_type_dropdown.setCurrentIndex(default_values['representation_type'])
+        representation_type_dropdown.setToolTip('Variable to be displayed on the plot.')
+
+        window_limit = QLabel("Amount of data presented:")
+        window_limit_dropdown = QComboBox(self)
+        window_limit_dropdown.addItems(['All data', '1 minute', '2 minutes', '3 minutes', '4 minutes', '5 minutes', '10 minutes'])
+        window_limit_dropdown.setCurrentIndex(default_values['window_limit'])
+        window_limit_dropdown.setToolTip('This setting adjusts the amount of data that will be displayed on the plot. For example, if \"1 minute\" is selected, then only the last 1 minute of data will be displayed.')
+
+        h_layout.addWidget(representation_type)
+        h_layout.addWidget(representation_type_dropdown)
+        inner_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Maximum)
+        h_layout.addItem(inner_spacer)
+        h_layout.addWidget(window_limit)
+        h_layout.addWidget(window_limit_dropdown)
+
+        layout.addLayout(h_layout)
+
+        h_layout = QHBoxLayout()
+
+        rr_window_size = QLabel("RR window size:")
+        rr_window_size_textbox = QLineEdit(default_values['rr_window'])
+        rr_window_size_textbox.setValidator(QIntValidator(1,999))
+        rr_window_size_textbox.setToolTip('Set the window size to calculate sdNN. Only used when \"sdNN\" is the representation type.')
+
+        h_layout.addWidget(rr_window_size)
+        h_layout.addWidget(rr_window_size_textbox)
+        inner_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Maximum)
+        h_layout.addItem(inner_spacer)
+
+        layout.addLayout(h_layout)
+        spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        layout.addItem(spacer)
+
+        h_layout = QHBoxLayout()
+
+        # Create "Display states" checkbox
+        display_state_checkbox = QCheckBox('Display states', self)
+        display_state_checkbox.setChecked(default_values['display_states'])
+        display_state_checkbox.setToolTip('Display different colors for the states.')
+
+        h_layout.addWidget(display_state_checkbox)
+        inner_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Maximum)
+        h_layout.addItem(inner_spacer)
+
+        layout.addLayout(h_layout)
+
+        h_layout = QHBoxLayout()
+
+        time_in_state_0 = QLabel("Time in state 0(s):")
+        time_in_state_0_textbox = QLineEdit(default_values['time_in_state_0'])
+        time_in_state_0_textbox.setValidator(QIntValidator(1,999))
+
+        h_layout.addWidget(time_in_state_0)
+        h_layout.addWidget(time_in_state_0_textbox)
+        inner_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Maximum)
+        h_layout.addItem(inner_spacer)
+
+        layout.addLayout(h_layout)
+
+        h_layout = QHBoxLayout()
+
+        time_in_state_1 = QLabel("Time in state 1(s):")
+        time_in_state_1_textbox = QLineEdit(default_values['time_in_state_1'])
+        time_in_state_1_textbox.setValidator(QIntValidator(1,999))
+
+        h_layout.addWidget(time_in_state_1)
+        h_layout.addWidget(time_in_state_1_textbox)
+        inner_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Maximum)
+        h_layout.addItem(inner_spacer)
+
+        layout.addLayout(h_layout)
+        spacer = QSpacerItem(20, 20, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        layout.addItem(spacer)
+
+        h_layout = QHBoxLayout()
+
+        # Create "Display threshold line" checkbox
+        display_thershold_checkbox = QCheckBox('Display decision boundary line', self)
+        display_thershold_checkbox.setChecked(default_values['display_decision_boundary'])
+        display_thershold_checkbox.setToolTip('Display the setted threshold line in the plot.')
+
+        h_layout.addWidget(display_thershold_checkbox)
+        inner_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Maximum)
+        h_layout.addItem(inner_spacer)
+
+        layout.addLayout(h_layout)
+
+        h_layout = QHBoxLayout()
+
+        threshold_line = QLabel("Decision boundary value:")
+        self.threshold_line_textbox = QLineEdit(default_values['decision_boundary'])
+        self.threshold_line_textbox.setValidator(QIntValidator(1,999))
+
+        # Create a button
+        button = QPushButton("Calculate best boundary")
+        button.clicked.connect(self.select_folder)
+
+        h_layout.addWidget(threshold_line)
+        h_layout.addWidget(self.threshold_line_textbox)
+        h_layout.addWidget(button)
+
+        layout.addLayout(h_layout)        
+
         def save_config():
             '''
-            Save the new configuration
-            '''
+            Function called when the save button are pressed.
 
-            # Saving here!
+            This function save the new settings.
+            '''
+            aux = []
+            
+            # Checking if there is any empty string
+            aux.append(representation_type_dropdown.currentIndex())
+            aux.append(representation_type_dropdown.currentText())
+            aux.append(window_limit_dropdown.currentIndex())
+            aux.append(window_limit_dropdown.currentText())
+            aux.append(rr_window_size_textbox.text() if rr_window_size_textbox.text() != '' else self.setting_values['hrv_window'])
+            aux.append(display_state_checkbox.isChecked())
+            aux.append(time_in_state_0_textbox.text() if time_in_state_0_textbox.text() != '' else self.setting_values['time_in_state_0'])
+            aux.append(time_in_state_1_textbox.text() if time_in_state_1_textbox.text() != '' else self.setting_values['time_in_state_1'])
+            aux.append(display_thershold_checkbox.isChecked())
+            aux.append(self.threshold_line_textbox.text() if self.threshold_line_textbox.text() != '' else self.setting_values['threshold_line'])
+
+
+            self.setting_values = {
+                'representation_type': aux[0],
+                'representation_type_value': aux[1],
+                'window_limit': aux[2],
+                'window_limit_value': aux[3],
+                'rr_window' : aux[4],
+                'display_states': aux[5],
+                'time_in_state_0': aux[6],
+                'time_in_state_1': aux[7],
+                'display_decision_boundary': aux[8],
+                'decision_boundary' : aux[9],
+            }
+
+            self.write_config_file(self.setting_values)
 
             dialog.accept()
 
         # Create "Start collecting" button
-        ok_button = QPushButton('Save', self)
-        ok_button.clicked.connect(save_config)
+        self.ok_button = QPushButton('Save', self)
+        self.ok_button.clicked.connect(save_config)
 
         h_layout = QHBoxLayout()
         inner_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Maximum)
         h_layout.addItem(inner_spacer)
-        h_layout.addWidget(ok_button)
+        h_layout.addWidget(self.ok_button)
         inner_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Maximum)
         h_layout.addItem(inner_spacer)
 

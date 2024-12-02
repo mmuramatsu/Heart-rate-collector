@@ -4,3 +4,6 @@ bleak
 matplotlib
 PyQt5
 pynput
+scikit-learn
+hrv-analysis
+astropy < 6.0
