@@ -199,30 +199,40 @@ class Data_collector(QThread):
         '''
 
         if data[0] == 0x00:
+            cur_pc_time = ts.time()
+
             if self.save_current_time:
-                cur_t = datetime.datetime.now().time()
+                cur_t = datetime.datetime.now()
                 
             if self.data_ecg.time == []:
                 # Sets t0 to current time
-                self.data_ecg.t0 = ts.time()
+                self.data_ecg.t0 = cur_pc_time
                 t = 0.0
             else:
-                t = ts.time() - self.data_ecg.t0
+                t = cur_pc_time - self.data_ecg.t0
 
-            timestamp = self.convert_to_unsigned_long(data, 1, 8)
+            base_timestamp_ns = self.convert_to_unsigned_long(data, 1, 8)
             step = 3
             samples = data[10:]
             offset = 0
+            sample_index = 0
+
+            # Sampling rate of Polar H10 is 130 Hz
+            sampling_interval_ns = 1_000_000_000 / 130.0
+            sampling_interval_s = 1.0 / 130.0
+            sampling_interval_delta = datetime.timedelta(seconds=sampling_interval_s)
 
             while offset < len(samples):
                 ecg = self.convert_array_to_signed_int(samples, offset, step)
                 offset += step
-                self.data_ecg.time.extend([t])
-                self.data_ecg.timestamp.extend([timestamp])
-                self.data_ecg.ecg.extend([ecg])
+
+                self.data_ecg.time.append(t + (sample_index * sampling_interval_s))
+                self.data_ecg.timestamp.append(base_timestamp_ns + (sample_index * sampling_interval_ns))
+                self.data_ecg.ecg.append(ecg)
 
                 if self.save_current_time:
-                    self.data_ecg.current_time.extend([cur_t])
+                    incremented_cur_t = cur_t + (sample_index * sampling_interval_delta)
+                    self.data_ecg.current_time.append(incremented_cur_t.time())
 
 
     def convert_array_to_signed_int(self, data, offset, length):
