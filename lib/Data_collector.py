@@ -3,7 +3,6 @@ import datetime
 import time as ts
 
 from bleak import BleakClient
-from hrvanalysis import get_nn_intervals
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -13,6 +12,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from lib.Data import Data
 from lib.Data_ecg import Data_ecg
 from lib.Data_rr import Data_rr
+from lib.heart_signal_processor import clean_rr_intervals
 
 
 # UUID for model number
@@ -157,7 +157,7 @@ class Data_collector(QThread):
             if self.setting_values['representation_type'] == 1:
                 rr_window = int(self.setting_values['rr_window'])
 
-                nn_intervals = get_nn_intervals(self.data_rr.rr_values, verbose=False)
+                nn_intervals = clean_rr_intervals(self.data_rr.rr_values, verbose=False)
 
                 if len(nn_intervals) < rr_window:
                     std = np.std(nn_intervals)
