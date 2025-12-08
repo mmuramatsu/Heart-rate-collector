@@ -47,15 +47,16 @@ class Scan(QThread):
 
         devices = await BleakScanner.discover()
         for d in devices:
-            name = d.name
-            address = d.address
-            print('Device name: ', name)
-            print('MAC Address: ', address)
-            #print('Metadata: ')
-            #print(d.metadata)
-            print('\n')
+            if d is not None:
+                name = d.name if d.name else "Unknown/No Name"
+                address = d.address
+                print('Device name: ', name)
+                print('MAC Address: ', address)
+                #print('Metadata: ')
+                #print(d.metadata)
+                print('\n')
 
-            if "Polar" in name:
-                self.log_signal.emit(name, address)
+                if "Polar" in name:
+                    self.log_signal.emit(name, address)
 
         print('\n\n')
