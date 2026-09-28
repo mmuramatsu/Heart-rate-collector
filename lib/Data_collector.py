@@ -148,9 +148,19 @@ class Data_collector(QThread):
             hr = data[1]
             self.data_rr.hr_values.append(hr)
 
-            # data[2:4] is the RR interval
-            # Convert the bytes in UINT16
-            rr = int.from_bytes(data[2:4], byteorder='little', signed=False)
+            # Extract all RR intervals present in the BLE notification packet.
+            # Each BLE Heart Rate Measurement packet may contain multiple UINT16
+            # RR intervals (starting at byte 2), since more than one beat can
+            # occur within the ~1 s notification window.
+            # We compute the mean to preserve the 1:1 pipeline structure.
+            offset = 2
+            rr_intervals_in_packet = []
+            while offset + 2 <= len(data):
+                rr_raw = int.from_bytes(data[offset:offset + 2], byteorder='little', signed=False)
+                rr_intervals_in_packet.append(rr_raw)
+                offset += 2
+
+            rr = np.mean(rr_intervals_in_packet)
             self.data_rr.rr_values.append(rr)
 
             # Calculate the sdNN if necessary
@@ -186,7 +196,7 @@ class Data_collector(QThread):
                 elif self.setting_values['representation_type'] == 1:
                     self.plot_signal.emit(t if not self.save_current_time else len(self.data_rr.time)-1, std, self.data_rr.state[-1])
 
-            print(f'Time: {t} s,' + (f'   Current_time: {cur_t}' if self.save_current_time else '') + f'   Heart rate: {hr} bpm,       RR-interval: {rr} ms')
+            print(f'Time: {t} s,' + (f'   Current_time: {cur_t}' if self.save_current_time else '') + f'   Heart rate: {hr} bpm,       RR-interval (mean of {len(rr_intervals_in_packet)}): {rr:.1f} ms')
 
 
     def parse_ecg(self, sender, data):
