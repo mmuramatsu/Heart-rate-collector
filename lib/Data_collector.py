@@ -131,6 +131,24 @@ class Data_collector(QThread):
         # If the 4th bit of the bytearray is 1 then RR reads were sent
         if data[0] & 0b00010000 == 0b00010000:
 
+            # Extract all RR intervals present in the BLE notification packet.
+            # Each BLE Heart Rate Measurement packet may contain multiple UINT16
+            # RR intervals (starting at byte 2), since more than one beat can
+            # occur within the ~1 s notification window.
+            # We compute the mean to preserve the 1:1 pipeline structure.
+            offset = 2
+            rr_intervals_in_packet = []
+            while offset + 2 <= len(data):
+                rr_raw = int.from_bytes(data[offset:offset + 2], byteorder='little', signed=False)
+                rr_intervals_in_packet.append(rr_raw)
+                offset += 2
+
+            # Discard malformed packets that set the RR flag but contain no
+            # valid RR data — their content is unreliable and a NaN value
+            # would break downstream HRV metric calculations.
+            if not rr_intervals_in_packet:
+                return
+
             if self.save_current_time:
                 cur_t = datetime.datetime.now().time()
                 self.data_rr.current_time.append(cur_t)
@@ -147,18 +165,6 @@ class Data_collector(QThread):
             # data[1] is the HR read
             hr = data[1]
             self.data_rr.hr_values.append(hr)
-
-            # Extract all RR intervals present in the BLE notification packet.
-            # Each BLE Heart Rate Measurement packet may contain multiple UINT16
-            # RR intervals (starting at byte 2), since more than one beat can
-            # occur within the ~1 s notification window.
-            # We compute the mean to preserve the 1:1 pipeline structure.
-            offset = 2
-            rr_intervals_in_packet = []
-            while offset + 2 <= len(data):
-                rr_raw = int.from_bytes(data[offset:offset + 2], byteorder='little', signed=False)
-                rr_intervals_in_packet.append(rr_raw)
-                offset += 2
 
             rr = np.mean(rr_intervals_in_packet)
             self.data_rr.rr_values.append(rr)
