@@ -115,10 +115,15 @@ class MainWindow(QMainWindow):
         self.save_current_time_checkbox = QCheckBox('Save current time', self)
         self.save_current_time_checkbox.setToolTip('Save current machine time (HH:MM:SS) during the data collection.')
 
+        # Create "Average RR intervals" checkbox
+        self.average_rr_checkbox = QCheckBox('Average RR intervals', self)
+        self.average_rr_checkbox.setToolTip('When checked, multiple RR intervals in a single BLE packet are averaged into one value.\nWhen unchecked (default), each individual RR interval is recorded as a separate data point.')
+
         # Add checkboxes to the horizontal layout
         checkbox_layout.addWidget(self.display_graph_checkbox)
         checkbox_layout.addWidget(self.collect_ecg_checkbox)
         checkbox_layout.addWidget(self.save_current_time_checkbox)
+        checkbox_layout.addWidget(self.average_rr_checkbox)
 
         # Add the checkbox layout to the main layout
         layout.addLayout(checkbox_layout)
@@ -343,6 +348,9 @@ class MainWindow(QMainWindow):
             return
         
         address = self.devices_dict[self.devices_dropdown.currentText()]
+
+        # Include the RR processing mode in settings so it flows to Data_collector
+        self.setting_values['average_rr'] = self.average_rr_checkbox.isChecked()
 
         self.hide()
         self.collect_window = Collect_window(self,

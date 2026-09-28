@@ -149,60 +149,112 @@ class Data_collector(QThread):
             if not rr_intervals_in_packet:
                 return
 
-            if self.save_current_time:
-                cur_t = datetime.datetime.now().time()
-                self.data_rr.current_time.append(cur_t)
-
-            if self.data_rr.time == []:
-                # Sets t0 to current time
-                self.data_rr.t0 = ts.time()
-                t = 0
-            else:
-                t = ts.time() - self.data_rr.t0
-
-            self.data_rr.time.append(t)
-
             # data[1] is the HR read
             hr = data[1]
-            self.data_rr.hr_values.append(hr)
 
-            rr = np.mean(rr_intervals_in_packet)
-            self.data_rr.rr_values.append(rr)
+            # Initialize t0 on the very first packet
+            if self.data_rr.time == []:
+                self.data_rr.t0 = ts.time()
 
-            # Calculate the sdNN if necessary
-            if self.setting_values['representation_type'] == 1:
-                rr_window = int(self.setting_values['rr_window'])
+            base_t = ts.time() - self.data_rr.t0
 
-                nn_intervals = clean_rr_intervals(self.data_rr.rr_values, verbose=False)
+            if self.save_current_time:
+                base_cur_t = datetime.datetime.now()
 
-                if len(nn_intervals) < rr_window:
-                    std = np.std(nn_intervals)
-                else:
-                    std = np.std(nn_intervals[-rr_window:])
+            if self.setting_values.get('average_rr', False):
+                # "Mean" mode: average all RR intervals into a single data point.
+                t = base_t
 
-                self.data_rr.std.append(std)
+                self.data_rr.time.append(t)
+                self.data_rr.hr_values.append(hr)
 
-            # Calculate the state based on time, if necessary
-            if self.setting_values['display_states']:
-                target_state = 0 if self.data_rr.current_state == 0 else 1
-                max_time = int(self.setting_values[f'time_in_state_{target_state}'])
-                self.data_rr.state.append(target_state if self.data_rr.count_state < max_time else 1 - target_state)
+                rr = np.mean(rr_intervals_in_packet)
+                self.data_rr.rr_values.append(rr)
 
-                self.data_rr.count_state += 1
+                if self.save_current_time:
+                    cur_t = base_cur_t.time()
+                    self.data_rr.current_time.append(cur_t)
 
-                if self.data_rr.count_state >= max_time:
-                    self.data_rr.count_state = 0
+                self._process_rr_data_point(t, hr, rr)
 
-                    self.data_rr.current_state = 1 if target_state == 0 else 0
+            else:
+                # "All points" mode (default): each RR interval becomes its own
+                # data point. The last beat in the packet is the most recent one,
+                # so its timestamp is base_t. Earlier beats are estimated by
+                # subtracting the sum of subsequent RR intervals from base_t.
+                for i, rr in enumerate(rr_intervals_in_packet):
+                    remaining_rr_sum = sum(rr_intervals_in_packet[i + 1:]) / 1000.0
+                    t = base_t - remaining_rr_sum
 
-            if self.display_graph:
-                # Plot the HR values list
-                if self.setting_values['representation_type'] == 0:
-                    self.plot_signal.emit(t if not self.save_current_time else len(self.data_rr.time)-1, hr, self.data_rr.state[-1])
-                elif self.setting_values['representation_type'] == 1:
-                    self.plot_signal.emit(t if not self.save_current_time else len(self.data_rr.time)-1, std, self.data_rr.state[-1])
+                    self.data_rr.time.append(t)
+                    self.data_rr.hr_values.append(hr)
+                    self.data_rr.rr_values.append(rr)
 
-            print(f'Time: {t} s,' + (f'   Current_time: {cur_t}' if self.save_current_time else '') + f'   Heart rate: {hr} bpm,       RR-interval (mean of {len(rr_intervals_in_packet)}): {rr:.1f} ms')
+                    if self.save_current_time:
+                        cur_t = (base_cur_t - datetime.timedelta(seconds=remaining_rr_sum)).time()
+                        self.data_rr.current_time.append(cur_t)
+
+                    self._process_rr_data_point(t, hr, rr)
+
+            # Console log
+            if self.setting_values.get('average_rr', False):
+                rr_mean = np.mean(rr_intervals_in_packet)
+                ct_str = f'   Current_time: {base_cur_t.time()}' if self.save_current_time else ''
+                print(f'Time: {base_t} s,{ct_str}   Heart rate: {hr} bpm,       RR-interval (mean of {len(rr_intervals_in_packet)}): {rr_mean:.1f} ms')
+            else:
+                for i, rr_val in enumerate(rr_intervals_in_packet):
+                    remaining_rr_sum = sum(rr_intervals_in_packet[i + 1:]) / 1000.0
+                    t_log = base_t - remaining_rr_sum
+                    ct_str = ''
+                    if self.save_current_time:
+                        ct = (base_cur_t - datetime.timedelta(seconds=remaining_rr_sum)).time()
+                        ct_str = f'   Current_time: {ct}'
+                    print(f'Time: {t_log} s,{ct_str}   Heart rate: {hr} bpm,       RR-interval [{i+1}/{len(rr_intervals_in_packet)}]: {rr_val} ms')
+
+
+    def _process_rr_data_point(self, t, hr, rr):
+        '''
+        Process a single RR data point: compute sdNN, advance the state machine,
+        and emit the plot signal. Shared by both mean and expand modes.
+
+        Parameters:
+            t (float): elapsed time in seconds since t0
+            hr (int): heart rate in BPM
+            rr (float): RR interval value
+        '''
+
+        # Calculate the sdNN if necessary
+        if self.setting_values['representation_type'] == 1:
+            rr_window = int(self.setting_values['rr_window'])
+
+            nn_intervals = clean_rr_intervals(self.data_rr.rr_values, verbose=False)
+
+            if len(nn_intervals) < rr_window:
+                std = np.std(nn_intervals)
+            else:
+                std = np.std(nn_intervals[-rr_window:])
+
+            self.data_rr.std.append(std)
+
+        # Calculate the state based on time, if necessary
+        if self.setting_values['display_states']:
+            target_state = 0 if self.data_rr.current_state == 0 else 1
+            max_time = int(self.setting_values[f'time_in_state_{target_state}'])
+            self.data_rr.state.append(target_state if self.data_rr.count_state < max_time else 1 - target_state)
+
+            self.data_rr.count_state += 1
+
+            if self.data_rr.count_state >= max_time:
+                self.data_rr.count_state = 0
+
+                self.data_rr.current_state = 1 if target_state == 0 else 0
+
+        if self.display_graph:
+            # Plot the HR values list
+            if self.setting_values['representation_type'] == 0:
+                self.plot_signal.emit(t if not self.save_current_time else len(self.data_rr.time)-1, hr, self.data_rr.state[-1])
+            elif self.setting_values['representation_type'] == 1:
+                self.plot_signal.emit(t if not self.save_current_time else len(self.data_rr.time)-1, std, self.data_rr.state[-1])
 
 
     def parse_ecg(self, sender, data):
